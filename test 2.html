@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Weather & Crop Advisor with Admin User Creation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body { font-family: Arial, sans-serif; text-align: center; color: white; padding-top: 40px;
+       background: linear-gradient(to right, #4facfe, #00f2fe); }
+.box { background: rgba(0,0,0,0.3); padding: 25px; border-radius: 15px; width: 340px; margin: auto; margin-top: 20px; }
+input, select, button { padding: 12px; width: 100%; font-size: 16px; border: none; border-radius: 8px; margin-top: 10px; }
+button { background: #ff9800; color: white; cursor: pointer; }
+button:hover { background: #e68900; }
+.hidden { display: none; }
+.crop-box, .billing-box { margin-top: 15px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; }
+#billsList ul, #usernamesList ul { text-align: left; padding-left: 15px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="box" id="loginBox">
+    <h2>🔐 Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <p id="loginMsg"></p>
+</div>
+
+<!-- USER APP -->
+<div class="box hidden" id="appBox">
+    <h2>🌦 Weather & Crop Advisor</h2>
+    <p id="welcome"></p>
+    <button onclick="logout()">🚪 Logout</button>
+
+    <!-- Soil selection -->
+    <select id="soilType">
+        <option value="">🌱 Select Soil Type</option>
+        <option value="sandy">Sandy Soil</option>
+        <option value="clay">Clay Soil</option>
+        <option value="loamy">Loamy Soil</option>
+        <option value="black">Black Soil</option>
+    </select>
+    <button id="weatherBtn" onclick="getWeather()">Get Weather</button>
+
+    <p id="location"></p>
+    <p id="temp"></p>
+    <p id="desc"></p>
+
+    <div class="crop-box">
+        <h3>🌾 Recommended Crops</h3>
+        <p id="crops">---</p>
+    </div>
+
+    <div class="crop-box" id="billingBox">
+        <h3>🧾 Buy Crops</h3>
+        <select id="cropSelect">
+            <option value="">Select Crop</option>
+            <option value="Groundnut" data-price="50">Groundnut - $50/kg</option>
+            <option value="Watermelon" data-price="30">Watermelon - $30/kg</option>
+            <option value="Bajra" data-price="40">Bajra - $40/kg</option>
+            <option value="Wheat" data-price="25">Wheat - $25/kg</option>
+            <option value="Rice" data-price="60">Rice - $60/kg</option>
+            <option value="Sugarcane" data-price="35">Sugarcane - $35/kg</option>
+            <option value="Maize" data-price="45">Maize - $45/kg</option>
+            <option value="Cotton" data-price="55">Cotton - $55/kg</option>
+            <option value="Vegetables" data-price="20">Vegetables - $20/kg</option>
+            <option value="Soybean" data-price="50">Soybean - $50/kg</option>
+            <option value="Sorghum" data-price="30">Sorghum - $30/kg</option>
+        </select>
+        <input type="number" id="cropQty" placeholder="Quantity (kg)" min="1">
+        <button onclick="buyCrop()">Buy</button>
+        <p id="billResult">Total: $0</p>
+    </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="box hidden" id="adminBox">
+    <h2>🛠 Admin Panel</h2>
+    <button onclick="logout()">🚪 Logout</button>
+    <p>Only admin can see this section</p>
+
+    <!-- Orders -->
+    <div class="box">
+        <h3>📄 All Orders</h3>
+        <button onclick="showOrders()">View Orders</button>
+        <div id="billsList"></div>
+    </div>
+
+    <!-- Users -->
+    <div class="box" style="margin-top: 15px;">
+        <h4>👤 View Users</h4>
+        <button onclick="showUsernames()">View Users & IDs</button>
+        <div id="usernamesList"></div>
+    </div>
+
+    <!-- Create User -->
+    <div class="box" style="margin-top: 15px;">
+        <h4>➕ Create New User</h4>
+        <input type="text" id="newUsername" placeholder="Username">
+        <input type="password" id="newPassword" placeholder="Password">
+        <select id="newRole">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+        </select>
+        <button onclick="createUser()">Create User</button>
+        <p id="createUserMsg"></p>
+    </div>
+</div>
+
+<script>
+// Load users from localStorage or default
+let users = JSON.parse(localStorage.getItem("users")) || [
+    { userID: "U001", username: "admin", password: "admin123", role: "admin" },
+    { userID: "U002", username: "user", password: "user123", role: "user" }
+];
+
+// Load orders from localStorage
+let orders = JSON.parse(localStorage.getItem("orders")) || [];
+
+// SAVE users to localStorage whenever updated
+function saveUsers() { localStorage.setItem("users", JSON.stringify(users)); }
+
+// LOGIN
+function login() {
+    users = JSON.parse(localStorage.getItem("users")) || users;
+    const u = document.getElementById("username").value;
+    const p = document.getElementById("password").value;
+    const user = users.find(x => x.username === u && x.password === p);
+    if (!user) { document.getElementById("loginMsg").innerText = "❌ Invalid credentials"; return; }
+    localStorage.setItem("loggedUser", JSON.stringify(user));
+    loadApp();
+}
+
+// LOGOUT
+function logout() { localStorage.removeItem("loggedUser"); location.reload(); }
+
+// LOAD APP
+function loadApp() {
+    const user = JSON.parse(localStorage.getItem("loggedUser"));
+    if (!user) return;
+    document.getElementById("loginBox").classList.add("hidden");
+
+    if (user.role === "admin") {
+        document.getElementById("adminBox").classList.remove("hidden");
+        document.getElementById("appBox").classList.add("hidden");
+    } else {
+        document.getElementById("appBox").classList.remove("hidden");
+        document.getElementById("adminBox").classList.add("hidden");
+        document.getElementById("welcome").innerText = `👋 Welcome, ${user.username} (${user.role})`;
+    }
+}
+
+// CREATE USER
+function generateUserID() { return "U" + Math.floor(1000 + Math.random() * 9000); }
+function createUser() {
+    const username = document.getElementById("newUsername").value.trim();
+    const password = document.getElementById("newPassword").value.trim();
+    const role = document.getElementById("newRole").value;
+    const msg = document.getElementById("createUserMsg");
+
+    if (!username || !password) { msg.innerText = "❌ Enter username & password"; return; }
+    if (users.find(u => u.username === username)) { msg.innerText = "❌ Username exists"; return; }
+
+    const newUser = { userID: generateUserID(), username, password, role };
+    users.push(newUser);
+    saveUsers();
+    msg.innerText = `✅ Created: ${newUser.userID} - ${username} (${role})`;
+    document.getElementById("newUsername").value = "";
+    document.getElementById("newPassword").value = "";
+    document.getElementById("newRole").value = "user";
+}
+
+// SHOW USERS
+function showUsernames() {
+    const listDiv = document.getElementById("usernamesList");
+    if (!users || users.length === 0) { listDiv.innerHTML = "No users found."; return; }
+    let html = "<ul>";
+    users.forEach(u => { html += `<li>${u.userID} - ${u.username} (${u.role})</li>`; });
+    html += "</ul>";
+    listDiv.innerHTML = html;
+}
+
+// BUY CROPS
+function buyCrop() {
+    const cropSelect = document.getElementById("cropSelect");
+    const qty = Number(document.getElementById("cropQty").value);
+    const user = JSON.parse(localStorage.getItem("loggedUser"));
+    if (!user || user.role !== "user") return alert("❌ Only users can buy crops.");
+    if (!cropSelect.value || !qty || qty <= 0) return alert("Enter valid crop and quantity.");
+
+    const price = Number(cropSelect.selectedOptions[0].dataset.price);
+    const total = price * qty;
+    document.getElementById("billResult").innerText = `Total: $${total}`;
+
+    const order = { userID: user.userID, username: user.username, crop: cropSelect.value, quantity: qty, total, date: new Date().toLocaleString() };
+    orders.push(order);
+    localStorage.setItem("orders", JSON.stringify(orders));
+    alert(`✅ Order placed: ${cropSelect.value}, ${qty} kg, $${total}`);
+}
+
+// SHOW ORDERS
+function showOrders() {
+    const user = JSON.parse(localStorage.getItem("loggedUser"));
+    if (!user || user.role !== "admin") return alert("❌ Only admin can view orders.");
+
+    const list = document.getElementById("billsList");
+    if (orders.length === 0) { list.innerHTML = "No orders yet."; return; }
+    let html = "<ul>";
+    orders.forEach(o => { html += `<li>${o.date} - ${o.username} bought ${o.quantity} kg of ${o.crop} for $${o.total}</li>`; });
+    html += "</ul>";
+    list.innerHTML = html;
+}
+
+// WEATHER LOGIC (optional, same as before)
+const apiKey = "6939825f52f097a1b79e6fdc39eb35dc";
+function getWeather() {
+    const soil = document.getElementById("soilType").value;
+    if (!soil) return alert("Select soil type");
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            const { latitude, longitude } = pos.coords;
+            fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${apiKey}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById("location").innerText = `📍 ${data.name}, ${data.sys.country}`;
+                    document.getElementById("temp").innerText = `🌡 Temperature: ${data.main.temp} °C`;
+                    document.getElementById("desc").innerText = `☁ ${data.weather[0].description}`;
+                    suggestCrops(data.main.temp, soil);
+                });
+        },
+        () => alert("Location denied")
+    );
+}
+function suggestCrops(temp, soil) {
+    let crops = "";
+    if (soil === "sandy") crops = "Groundnut, Watermelon, Bajra";
+    else if (soil === "clay") crops = temp < 20 ? "Wheat, Barley" : "Rice, Sugarcane";
+    else if (soil === "loamy") crops = "Maize, Cotton, Vegetables";
+    else if (soil === "black") crops = "Cotton, Soybean, Sorghum";
+    document.getElementById("crops").innerText = crops;
+}
+
+// AUTO LOGIN CHECK
+loadApp();
+</script>
+</body>
+</html>
